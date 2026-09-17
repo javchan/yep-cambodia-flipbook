@@ -645,6 +645,7 @@ function flipNext(){
   back.appendChild(renderPageContent(toSpread.left));
   leaf.appendChild(front);
   leaf.appendChild(back);
+  leaf.style.transform = 'rotateY(0deg)';
   leavesContainer.appendChild(leaf);
 
   // Prepare the static pages underneath to already reflect the "settled" state on the sides not flipping
@@ -653,18 +654,26 @@ function flipNext(){
   clearNode(staticRight);
   staticRight.appendChild(renderPageContent(toSpread.right));
 
-  requestAnimationFrame(()=>{
-    leaf.style.transform = 'rotateY(-180deg)';
-  });
-
-  leaf.addEventListener('transitionend', function handler(){
-    leaf.removeEventListener('transitionend', handler);
+  let done = false;
+  function finish(){
+    if(done) return; done = true;
+    leaf.removeEventListener('transitionend', onEnd);
     current += 1;
     setStatic(current);
-    leavesContainer.removeChild(leaf);
+    if(leaf.parentNode) leavesContainer.removeChild(leaf);
     animating = false;
     updateCounter();
-  }, {once:true});
+  }
+  function onEnd(e){ if(e.target === leaf && e.propertyName === 'transform') finish(); }
+  leaf.addEventListener('transitionend', onEnd);
+
+  // Force a reflow so the initial transform is committed before we change it,
+  // otherwise some browsers (Windows Chrome/Edge) batch both styles and the
+  // transition — and its transitionend event — never fire, jamming the book.
+  void leaf.offsetWidth;
+  requestAnimationFrame(()=>{ leaf.style.transform = 'rotateY(-180deg)'; });
+  // Safety net: guarantee the flip completes even if transitionend is dropped.
+  setTimeout(finish, 1100);
 }
 
 function flipPrev(){
@@ -691,18 +700,25 @@ function flipPrev(){
   clearNode(staticLeft);
   staticLeft.appendChild(renderPageContent(toSpread.left));
 
-  requestAnimationFrame(()=>{
-    leaf.style.transform = 'rotateY(0deg)';
-  });
-
-  leaf.addEventListener('transitionend', function handler(){
-    leaf.removeEventListener('transitionend', handler);
+  let done = false;
+  function finish(){
+    if(done) return; done = true;
+    leaf.removeEventListener('transitionend', onEnd);
     current -= 1;
     setStatic(current);
-    leavesContainer.removeChild(leaf);
+    if(leaf.parentNode) leavesContainer.removeChild(leaf);
     animating = false;
     updateCounter();
-  }, {once:true});
+  }
+  function onEnd(e){ if(e.target === leaf && e.propertyName === 'transform') finish(); }
+  leaf.addEventListener('transitionend', onEnd);
+
+  // Force a reflow so the initial transform is committed before we change it
+  // (see flipNext) — prevents the transition/transitionend from being skipped.
+  void leaf.offsetWidth;
+  requestAnimationFrame(()=>{ leaf.style.transform = 'rotateY(0deg)'; });
+  // Safety net: guarantee the flip completes even if transitionend is dropped.
+  setTimeout(finish, 1100);
 }
 
 function goNext(){
